@@ -1,0 +1,12 @@
+services:
+  postgres:
+    image: postgres:14.5
+    environment:
+      POSTGRES_DB: "filehub_db"
+      POSTGRES_USER: "user"
+      POSTGRES_PASSWORD: "pass"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    ports:
+      - "5432:5432"
+
+name: filehub
