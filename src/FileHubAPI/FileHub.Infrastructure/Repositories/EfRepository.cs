@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FileHub.Infrastructure.Repositories;
 
-internal class EfRepository<TEntity, TContext> : IRepository<TEntity> where TEntity : class
+public class EfRepository<TEntity, TContext> : IRepository<TEntity> where TEntity : class
     where TContext : DbContext
 {
     private readonly TContext _dbContext;

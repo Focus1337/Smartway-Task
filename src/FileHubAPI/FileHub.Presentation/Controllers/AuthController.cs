@@ -79,7 +79,8 @@ public class AuthController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, user.Id);
     }
 
-    [HttpPost]
+    [Consumes("application/x-www-form-urlencoded")]
+    [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
         await _signInManager.SignOutAsync();

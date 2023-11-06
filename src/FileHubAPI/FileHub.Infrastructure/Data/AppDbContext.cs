@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using FileHub.Core.Models;
-using FileHub.Infrastructure.Data.Config;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -18,9 +17,6 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
-        IdentityConfiguration.Configure(builder);
         builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
     }
-
-    // public DbSet<Message> Messages => Set<Message>();
 }

@@ -1,6 +1,8 @@
-﻿using FileHub.Core.Models;
+﻿using Amazon.S3;
+using FileHub.Core.Models;
 using FileHub.Infrastructure.Data;
 using FileHub.Infrastructure.Options;
+using FileHub.Infrastructure.Repositories;
 using FileHub.Presentation.Models;
 using FileHub.Presentation.Services;
 using Microsoft.AspNetCore.Identity;
@@ -26,8 +28,8 @@ public static class ProgramExtensions
     public static void AddCustomApplicationServices(this WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<ApplicationUserService>();
-        // builder.Services.AddTransient<IMessageService, MessageService>();
-        //TODO: register repositories
+        builder.Services.AddSingleton<FileService>();
+        builder.Services.AddScoped<FileRepository>();
     }
 
     public static void AddCustomSwaggerGen(this WebApplicationBuilder builder) =>
@@ -69,15 +71,31 @@ public static class ProgramExtensions
                 builder.Configuration.GetSection(DbOptions.DbConfiguration));
 
         var dbOptions = builder.Configuration.GetSection(DbOptions.DbConfiguration).Get<DbOptions>();
+        if (dbOptions is null)
+            throw new ArgumentException("Cannot register DbContext: DbOptions is null. Check appsettings.");
 
         builder.Services.AddDbContext<AppDbContext>(options =>
         {
-            options.UseNpgsql(dbOptions!.ConnectionString,
+            options.UseNpgsql(dbOptions.ConnectionString,
                 action => action.MigrationsAssembly(typeof(AppDbContext).Assembly
                     .FullName));
             options.UseOpenIddict();
             options.EnableSensitiveDataLogging();
         });
+    }
+
+    public static void AddS3(this WebApplicationBuilder builder)
+    {
+        builder.Services
+            .Configure<S3Options>(
+                builder.Configuration.GetSection(S3Options.S3Configuration));
+
+        var s3Options = builder.Configuration.GetSection(S3Options.S3Configuration).Get<S3Options>();
+        if (s3Options is null)
+            throw new ArgumentException("Cannot register Minio: MinioOptions is null. Check appsettings.");
+
+        builder.Services.AddSingleton(new AmazonS3Client(s3Options.AccessKey, s3Options.SecretKey,
+            new AmazonS3Config { ServiceURL = s3Options.ServiceUrl, ForcePathStyle = true }));
     }
 
     public static void AddCustomAuthentication(this WebApplicationBuilder builder) =>
