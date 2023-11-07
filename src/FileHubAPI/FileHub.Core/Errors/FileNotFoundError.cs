@@ -1,6 +1,6 @@
 ﻿using FluentResults;
 
-namespace FileHub.Presentation.Errors;
+namespace FileHub.Core.Errors;
 
 public class FileNotFoundError : Error
 {

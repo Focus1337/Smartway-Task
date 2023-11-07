@@ -2,4 +2,6 @@
 
 namespace FileHub.Core.Models;
 
-public class ApplicationUser: IdentityUser<Guid> { }
+public class ApplicationUser : IdentityUser<Guid>
+{
+}

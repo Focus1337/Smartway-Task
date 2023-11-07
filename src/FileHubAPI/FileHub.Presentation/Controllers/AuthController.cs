@@ -30,33 +30,19 @@ public class AuthController : ControllerBase
 
     [Produces(MediaTypeNames.Application.Json)]
     [Consumes(MediaTypeNames.Application.Json)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(List<IdentityError>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(List<ErrorModel>))]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(Guid))]
     [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterUserDto registerUserDto)
+    public async Task<IActionResult> Register([FromBody] RegisterUserDto registerUserDto)
     {
         if (!ModelState.IsValid)
             return BadRequest();
 
         var user = new ApplicationUser { Email = registerUserDto.Email, UserName = registerUserDto.Email };
 
-        string NormalizedErrorCodes(IdentityResult result) =>
-            string.Join("; ", result.Errors.Select(e => e.Code));
-
-        string NormalizedErrorDescriptions(IdentityResult result) =>
-            string.Join("; ", result.Errors.Select(e => e.Description));
-
         var createResult = await _userManager.CreateAsync(user, registerUserDto.Password);
         if (!createResult.Succeeded)
-            return BadRequest();
-        // return new RegisterResponse
-        // {
-        //     ErrorResponse = new ErrorResponse
-        //     {
-        //         Error = NormalizedErrorCodes(result),
-        //         ErrorDescription = NormalizedErrorDescriptions(result)
-        //     }
-        // };
+            return BadRequest(ErrorModel.FromIdentityResult(createResult));
 
         var claimsResult = await _userManager.AddClaimsAsync(user,
             new[]
@@ -66,20 +52,13 @@ public class AuthController : ControllerBase
             });
 
         if (!claimsResult.Succeeded)
-            return BadRequest();
-        // return new RegisterResponse
-        // {
-        //     ErrorResponse = new ErrorResponse
-        //     {
-        //         Error = NormalizedErrorCodes(result),
-        //         ErrorDescription = NormalizedErrorDescriptions(result)
-        //     }
-        // };
+            return BadRequest(ErrorModel.FromIdentityResult(claimsResult));
 
         return StatusCode(StatusCodes.Status201Created, user.Id);
     }
 
     [Consumes("application/x-www-form-urlencoded")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
     {
@@ -109,7 +88,7 @@ public class AuthController : ControllerBase
             if (request.Username is null || request.Password is null)
                 return BadRequest(new OpenIddictResponse
                 {
-                    Error = OpenIddictConstants.Errors.InvalidRequest,
+                    Error = Errors.InvalidRequest,
                     ErrorDescription = "Username/password is null."
                 });
 
@@ -117,7 +96,7 @@ public class AuthController : ControllerBase
             if (user is null)
                 return BadRequest(new OpenIddictResponse
                 {
-                    Error = OpenIddictConstants.Errors.InvalidGrant,
+                    Error = Errors.InvalidGrant,
                     ErrorDescription = "The username/password couple is invalid."
                 });
 
@@ -125,7 +104,7 @@ public class AuthController : ControllerBase
             if (!result.Succeeded)
                 return BadRequest(new OpenIddictResponse
                 {
-                    Error = OpenIddictConstants.Errors.InvalidGrant,
+                    Error = Errors.InvalidGrant,
                     ErrorDescription = "The username/password couple is invalid."
                 });
 
@@ -169,7 +148,7 @@ public class AuthController : ControllerBase
             if (user is null)
                 return Forbid(new AuthenticationProperties(new Dictionary<string, string>
                 {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
                     [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
                         "The refresh token is no longer valid."
                 }!), OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -177,7 +156,7 @@ public class AuthController : ControllerBase
             if (!await _signInManager.CanSignInAsync(user))
                 return Forbid(new AuthenticationProperties(new Dictionary<string, string>
                 {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
                     [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
                         "The user is no longer allowed to sign in."
                 }!), OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -197,7 +176,7 @@ public class AuthController : ControllerBase
 
         return BadRequest(new OpenIddictResponse
         {
-            Error = OpenIddictConstants.Errors.UnsupportedGrantType,
+            Error = Errors.UnsupportedGrantType,
             ErrorDescription = "The specified grant type is not supported."
         });
     }

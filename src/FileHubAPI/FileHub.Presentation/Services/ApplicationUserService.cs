@@ -1,8 +1,6 @@
 ﻿using System.Security.Claims;
 using FileHub.Core.Models;
-using FileHub.Presentation.Models;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
 
 namespace FileHub.Presentation.Services;
@@ -17,9 +15,6 @@ public class ApplicationUserService
         _userManager = userManager;
         _httpContextAccessor = httpContextAccessor;
     }
-
-    public async Task<List<ApplicationUser>> GetUsers() =>
-        await _userManager.Users.ToListAsync();
 
     public async Task<ApplicationUser?> GetCurrentUser()
     {
