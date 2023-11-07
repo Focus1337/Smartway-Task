@@ -1,18 +1,13 @@
 ﻿using System.IO.Compression;
-using Amazon.S3;
+using System.Net.Mime;
 using Amazon.S3.Model;
-using FileHub.Infrastructure.Repositories;
 using FileHub.Presentation.Attributes;
+using FileHub.Presentation.Models;
 using FileHub.Presentation.Services;
-using Microsoft.AspNetCore.Http.HttpResults;
+using FluentResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FileHub.Presentation.Controllers;
-
-public record S3ObjectDto(string Name, string PreSignedUrl);
-
-public record GetFileResponse(string FileId, string OwnerId, string FileName, DateTime LastModified,
-    long ContentLength);
 
 [Route("api/[controller]")]
 [ApiController]
@@ -20,311 +15,282 @@ public class FilesController : ControllerBase
 {
     private readonly FileService _fileService;
     private readonly ApplicationUserService _userService;
-    private readonly FileRepository _fileRepository;
 
-    public FilesController(FileService fileService, ApplicationUserService userService,
-        FileRepository fileRepository)
+    public FilesController(FileService fileService, ApplicationUserService userService)
     {
         _fileService = fileService;
         _userService = userService;
-        _fileRepository = fileRepository;
-    }
-
-
-    [OpenIddictAuthorize]
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetFileAsync(string id)
-    {
-        if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
-
-        var result = await _fileService.GetByFileIdAsync(user.Id, id);
-        if (result is null)
-            return BadRequest();
-
-        return Ok(new GetFileResponse(result.Metadata["File-Id"], result.Metadata["Owner-Id"],
-            result.Metadata["File-Name"], result.LastModified, result.ContentLength));
     }
 
     [OpenIddictAuthorize]
-    [HttpGet("multiple")]
-    public async Task<IActionResult> GetMultipleFilesAsync([FromQuery] List<string> ids)
+    [HttpGet("{groupId:guid}/{fileId:guid}")]
+    [Produces(MediaTypeNames.Application.Json)]
+    [ProducesResponseType(typeof(FileDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetFileAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
+            return NotFound();
 
-        var items = new List<GetFileResponse>();
-        var taskList = ids.Select(fileId => GetItemAsync(user.Id, fileId)).ToList();
+        var result = await _fileService.GetFileByIdAsync(user.Id, groupId, fileId);
+        if (result.IsFailed)
+            return NotFound();
 
-        while (taskList.Any())
-        {
-            var finishedTask = await Task.WhenAny(taskList);
-            taskList.Remove(finishedTask);
-            await finishedTask;
-        }
-
-        return Ok(items);
-
-        async Task GetItemAsync(Guid userId, string fileId)
-        {
-            var item = await _fileService.GetByFileIdAsync(userId, fileId);
-            if (item is null) return;
-            items.Add(new GetFileResponse(item.Metadata["File-Id"], item.Metadata["Owner-Id"],
-                item.Metadata["File-Name"], item.LastModified, item.ContentLength));
-        }
+        var value = result.Value;
+        return Ok(FileDetailsDto.ToDto(value));
     }
 
     [OpenIddictAuthorize]
-    [HttpGet]
-    public async Task<IActionResult> GetAllFilesAsync()
+    [HttpGet("{groupId:guid}")]
+    [ProducesResponseType(typeof(List<FileDetailsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetGroupOfFilesAsync([FromRoute] Guid groupId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
+            return NotFound();
 
-        var result = await _fileService.GetAllFiles(user.Id);
-        var response = result.Select(item => new GetFileResponse(item.Metadata["File-Id"], item.Metadata["Owner-Id"],
-            item.Metadata["File-Name"], item.LastModified, item.ContentLength)).ToList();
+        var result = await _fileService.GetGroupOfFilesByIdAsync(user.Id, groupId);
+        if (result.IsFailed)
+            return NotFound();
 
+        var response = result.Value.Select(FileDetailsDto.ToDto).ToList();
         return Ok(response);
     }
 
     [OpenIddictAuthorize]
-    [HttpGet("{id}/stream")]
-    public async Task<IActionResult> GetFileStreamAsync(string id)
+    [HttpGet]
+    [Produces(MediaTypeNames.Application.Json)]
+    [ProducesResponseType(typeof(List<FileDetailsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAllFilesAsync()
     {
         if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
+            return NotFound();
 
-        var result = await _fileService.GetByFileIdAsync(user.Id, id);
-        if (result is null)
-            return BadRequest();
+        var result = await _fileService.GetAllFiles(user.Id);
+        if (result.IsFailed)
+            return NotFound();
 
-        return File(result.ResponseStream, result.Headers.ContentType);
+        var response = result.Value.Select(FileDetailsDto.ToDto).ToList();
+        return Ok(response);
     }
 
     [OpenIddictAuthorize]
-    [HttpGet("multiple/stream")]
-    public async Task GetMultipleFilesStreamAsync([FromQuery] List<string> ids)
+    [HttpGet("{groupId:guid}/{fileId:guid}/stream")]
+    [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetFileStreamAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
+    {
+        if (await _userService.GetCurrentUser() is not { } user)
+            return NotFound();
+
+        var result = await _fileService.GetFileByIdAsync(user.Id, groupId, fileId);
+        if (result.IsFailed)
+            return NotFound();
+
+        var value = result.Value;
+        return File(value.ResponseStream, value.Headers.ContentType);
+    }
+
+    [OpenIddictAuthorize]
+    [HttpGet("{groupId:guid}/stream")]
+    [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task GetGroupOfFilesStreamAsync([FromRoute] Guid groupId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
         {
-            Response.StatusCode = 400;
-            await Response.WriteAsJsonAsync(new S3ObjectDto("error", "smth"));
+            Response.StatusCode = 404;
+            await Response.WriteAsJsonAsync(new ErrorDto("error", "Not Found"));
             return;
         }
 
-        var items = new List<GetObjectResponse>();
-        var taskList = ids.Select(fileId => GetItemAsync(user.Id, fileId)).ToList();
-
-        while (taskList.Any())
+        var result = await _fileService.GetGroupOfFilesByIdAsync(user.Id, groupId);
+        if (result.IsFailed)
         {
-            var finishedTask = await Task.WhenAny(taskList);
-            taskList.Remove(finishedTask);
-            await finishedTask;
-            if (Response.StatusCode == 404)
-                return;
+            Response.StatusCode = 404;
+            await Response.WriteAsJsonAsync(new ErrorDto("error", "File Not Found"));
+            return;
         }
-
-        async Task GetItemAsync(Guid userId, string fileId)
-        {
-            var item = await _fileService.GetByFileIdAsync(userId, fileId);
-            if (item is null)
-            {
-                Response.StatusCode = 404;
-                await Response.WriteAsJsonAsync(new S3ObjectDto("doesn't exist", fileId));
-                Console.WriteLine("STOPPED STOPPED STOPPED STOPPED");
-                return;
-            }
-
-            items.Add(item);
-        }
-
-        Console.WriteLine("Starting to!!!!");
 
         Response.ContentType = "application/octet-stream";
         Response.Headers.Add("Content-Disposition", $"attachment; filename=\"files{DateTime.Now:HHmmss-ddMMyy}.zip\"");
-
-        using var archive = new ZipArchive(Response.BodyWriter.AsStream(), ZipArchiveMode.Create);
-        foreach (var item in items)
-        {
-            var entry = archive.CreateEntry(Path.GetFileName(item.Metadata["File-Name"]),
-                CompressionLevel.NoCompression);
-
-            await using var entryStream = entry.Open();
-            await item.ResponseStream.CopyToAsync(entryStream);
-        }
+        await _fileService.ZipFiles(Response.BodyWriter.AsStream(), result.Value);
     }
 
     [OpenIddictAuthorize]
-    [HttpPost("{id}/share")]
-    public async Task<IActionResult> ShareFileAsync(string id)
+    [HttpPost("{groupId:guid}/{fileId:guid}/share")]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ShareFileAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
+            return NotFound();
 
-        var result = await _fileService.ShareFileAsync(user.Id, id);
+        var result = await _fileService.ShareFileAsync(user.Id, groupId, fileId);
+        if (result.IsFailed)
+            return NotFound();
 
-        if (result is null)
-            return BadRequest();
-
-        return Ok(result);
+        return Ok(result.Value);
     }
 
+    // [OpenIddictAuthorize]
+    // [HttpPost("{groupId:guid}/share")]
+    // [ProducesResponseType(StatusCodes.Status404NotFound)]
+    // public async Task<IActionResult> ShareMultipleFilesAsync([FromRoute] Guid groupId)
+    // {
+    //     if (await _userService.GetCurrentUser() is not { } user)
+    //         return NotFound();
+    //
+    //     var result = await _fileService.GetGroupOfFilesByIdAsync(user.Id, groupId);
+    //     if (result.IsFailed)
+    //         return NotFound();
+    //
+    //     var items = result.Value;
+    //
+    //     var zipFileName = $"files{DateTime.Now:HHmmss-ddMMyy}.zip";
+    //     var zipStream = new MemoryStream();
+    //
+    //     using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
+    //     {
+    //         foreach (var item in items)
+    //         {
+    //             var entry = archive.CreateEntry(Path.GetFileName(item.Metadata["File-Name"]),
+    //                 CompressionLevel.NoCompression);
+    //
+    //             await using var entryStream = entry.Open();
+    //             await item.ResponseStream.CopyToAsync(entryStream);
+    //         }
+    //     }
+    //
+    //     zipStream.Position = 0;
+    //
+    //     await _fileService.UploadFileAsync(zipStream, "application/zip", zipFileName,
+    //         fileId, user.Id.ToString());
+    //
+    //     var shareResult = await _fileService.ShareFileAsync(user.Id, fileId);
+    //     if (shareResult.IsFailed)
+    //         return BadRequest();
+    //
+    //     return Ok(shareResult.Value);
+    //
+    //     async Task GetItemAsync(Guid userId, string id)
+    //     {
+    //         var item = await _fileService.GetFileByIdAsync(userId, id);
+    //         if (item.IsFailed)
+    //             return;
+    //
+    //         var z = item.Value;
+    //
+    //         if (z is null)
+    //             return;
+    //
+    //
+    //         items.Add(z);
+    //     }
+    // }
+
+    // [OpenIddictAuthorize]
+    // [HttpPost("upload")]
+    // [DisableRequestSizeLimit]
+    // [RequestFormLimits(MultipartBodyLengthLimit = int.MaxValue, ValueLengthLimit = int.MaxValue)]
+    // [Consumes("multipart/form-data")]
+    // [ProducesResponseType(StatusCodes.Status404NotFound)]
+    // public async Task<IActionResult> UploadFilesAsync([FromForm] List<IFormFile> files)
+    // {
+    //     if (await _userService.GetCurrentUser() is not { } user)
+    //         return BadRequest();
+    //
+    //     var taskList = files.Select(file => _fileService.UploadFileAsync(file.OpenReadStream(), file.ContentType,
+    //             file.FileName, fileId: Guid.NewGuid().ToString(), user.Id.ToString()))
+    //         .ToList();
+    //
+    //     var uploadedFiles = new List<string>();
+    //
+    //     while (taskList.Any())
+    //     {
+    //         var finishedTask = await Task.WhenAny(taskList);
+    //         taskList.Remove(finishedTask);
+    //         var task = await finishedTask;
+    //         if (task.IsSuccess)
+    //             uploadedFiles.Add((await finishedTask).Value);
+    //     }
+    //
+    //     return Ok(uploadedFiles);
+    // }
+
     [OpenIddictAuthorize]
-    [HttpPost("multiple/share")]
-    public async Task<IActionResult> ShareMultipleFilesAsync([FromQuery] List<string> ids)
+    [HttpGet("{groupId:guid}/{fileId:guid}/progress")]
+    public async Task<IActionResult> GetFileProgressAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
-
-        var items = new List<GetObjectResponse>();
-        var taskList = ids.Select(fileId => GetItemAsync(user.Id, fileId)).ToList();
-        var fileId = Guid.NewGuid().ToString();
-
-        while (taskList.Any())
-        {
-            var finishedTask = await Task.WhenAny(taskList);
-            taskList.Remove(finishedTask);
-            await finishedTask;
-        }
-
-        var zipFileName = $"files{DateTime.Now:HHmmss-ddMMyy}.zip";
-        var zipStream = new MemoryStream();
-
-        using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
-        {
-            foreach (var item in items)
-            {
-                var entry = archive.CreateEntry(Path.GetFileName(item.Metadata["File-Name"]),
-                    CompressionLevel.NoCompression);
-
-                await using var entryStream = entry.Open();
-                await item.ResponseStream.CopyToAsync(entryStream);
-            }
-        }
-
-        zipStream.Position = 0;
-
-        await _fileService.UploadFileAsync(zipStream, "application/zip", zipFileName,
-            fileId, user.Id.ToString());
-
-        var result = await _fileService.ShareFileAsync(user.Id, fileId);
-
-        if (result is null)
-            return BadRequest();
-
-        return Ok(result);
-
-        async Task GetItemAsync(Guid userId, string id)
-        {
-            var item = await _fileService.GetByFileIdAsync(userId, id);
-            if (item is null)
-            {
-                return;
-            }
-
-            items.Add(item);
-        }
-    }
-
-    [OpenIddictAuthorize]
-    [Consumes("multipart/form-data")]
-    [DisableRequestSizeLimit]
-    [RequestFormLimits(MultipartBodyLengthLimit = Int32.MaxValue, ValueLengthLimit = Int32.MaxValue)]
-    [HttpPost("upload")]
-    public async Task<IActionResult> UploadFilesAsync([FromForm] List<IFormFile> files)
-    {
-        if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
-
-        var taskList = files.Select(file => _fileService.UploadFileAsync(file.OpenReadStream(), file.ContentType,
-                file.FileName, fileId: Guid.NewGuid().ToString(), user.Id.ToString()))
-            .ToList();
-
-        var uploadedFiles = new List<string>();
-
-        while (taskList.Any())
-        {
-            var finishedTask = await Task.WhenAny(taskList);
-            taskList.Remove(finishedTask);
-            uploadedFiles.Add(await finishedTask);
-        }
-
-        return Ok(uploadedFiles);
-    }
-
-    [OpenIddictAuthorize]
-    [HttpGet("{id}/progress")]
-    public async Task<IActionResult> GetFileProgressAsync(string id)
-    {
-        if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest("User not found");
+            return NotFound("User not found");
 
         // if (await _fileService.GetByFileIdAsync(user.Id, id) is null)
         //     return BadRequest("File not found");
 
-        if (!_fileService.ProgressTrackingDict.ContainsKey(id))
-            return BadRequest("Already transferred");
-        var progress = _fileService.ProgressTrackingDict.GetValueOrDefault(id);
+        // if (!_fileService.ProgressTrackingDict.ContainsKey(id))
+        //     return Ok("Already transferred");
+        //
+        // var progress = _fileService.ProgressTrackingDict.GetValueOrDefault(id);
 
-        return Ok(progress);
+        // return Ok(progress);
+        return Ok();
     }
 
+    // [OpenIddictAuthorize]
+    // [HttpGet("multiple/progress")]
+    // [ProducesResponseType(StatusCodes.Status404NotFound)]
+    // public async Task<IActionResult> GetMultipleFilesProgressAsync(List<string> ids)
+    // {
+    //     if (await _userService.GetCurrentUser() is not { } user)
+    //         return BadRequest();
+    //
+    //     var taskList = ids.Select(id => GetUploadProgress(user.Id, id)).ToList();
+    //     var taskCount = taskList.Count;
+    //     var progressSum = 0;
+    //
+    //     while (taskList.Any())
+    //     {
+    //         var finishedTask = await Task.WhenAny(taskList);
+    //         taskList.Remove(finishedTask);
+    //         var task = await finishedTask;
+    //         if (task.IsSuccess)
+    //             progressSum += task.Value;
+    //     }
+    //
+    //     async Task<Result<int>> GetUploadProgress(Guid userId, string fileId)
+    //     {
+    //         var result = await _fileService.GetFileByIdAsync(userId, fileId);
+    //         if (result.IsFailed)
+    //         {
+    //             Response.StatusCode = 400;
+    //             await Response.WriteAsJsonAsync(new ErrorDto("error", "no such file"));
+    //             return Result.Fail<int>(result.Errors[0]);
+    //         }
+    //
+    //         if (!_fileService.ProgressTrackingDict.ContainsKey(fileId))
+    //         {
+    //             Response.StatusCode = 400;
+    //             await Response.WriteAsJsonAsync(new ErrorDto("error", "File already transferred"));
+    //             return Result.Fail<int>("File already transferred");
+    //         }
+    //
+    //         return Result.Ok(_fileService.ProgressTrackingDict.GetValueOrDefault(fileId));
+    //     }
+    //
+    //     return Ok(progressSum / taskCount);
+    // }
+
     [OpenIddictAuthorize]
-    [HttpGet("multiple/progress")]
-    public async Task<IActionResult> GetMultipleFilesProgressAsync(List<string> ids)
+    [HttpDelete("{groupId:guid}/{fileId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteFileAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
+            return NotFound();
 
-        var taskList = ids.Select(id => GetUploadProgress(user.Id, id)).ToList();
-        var taskCount = taskList.Count;
-        var progressSum = 0;
-
-        while (taskList.Any())
-        {
-            var finishedTask = await Task.WhenAny(taskList);
-            taskList.Remove(finishedTask);
-            progressSum += await finishedTask;
-        }
-
-        async Task<int> GetUploadProgress(Guid userId, string fileId)
-        {
-            if (await _fileService.GetByFileIdAsync(userId, fileId) is null)
-            {
-                Response.StatusCode = 400;
-                await Response.WriteAsJsonAsync(new S3ObjectDto("error", "no such file"));
-                return 0;
-            }
-
-            if (!_fileService.ProgressTrackingDict.ContainsKey(fileId))
-            {
-                Response.StatusCode = 400;
-                await Response.WriteAsJsonAsync(new S3ObjectDto("error", "File already transferred"));
-                return 0;
-            }
-            // return BadRequest("Already transferred");
-
-            return _fileService.ProgressTrackingDict.GetValueOrDefault(fileId);
-        }
-
-        return Ok(progressSum / taskCount);
-    }
-
-    [OpenIddictAuthorize]
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteFileAsync(string id)
-    {
-        if (await _userService.GetCurrentUser() is not { } user)
-            return BadRequest();
-
-        await _fileService.RemoveFileAsync(id, user.Id.ToString());
-        // var file = (await _fileRepository.GetAllAsync()).FirstOrDefault(f => f.StorageKey == Guid.Parse(id));
-        // if (file is null)
-        //     return BadRequest();
-
-        // await _fileRepository.DeleteAsync(file);
-        // await _fileRepository.
-        return NoContent();
+        var deleteResult = await _fileService.DeleteFileAsync(user.Id, groupId, fileId);
+        return deleteResult.IsSuccess ? NoContent() : NotFound();
     }
 }

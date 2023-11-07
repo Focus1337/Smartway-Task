@@ -109,7 +109,7 @@ public class AuthController : ControllerBase
             if (request.Username is null || request.Password is null)
                 return BadRequest(new OpenIddictResponse
                 {
-                    Error = Errors.InvalidRequest,
+                    Error = OpenIddictConstants.Errors.InvalidRequest,
                     ErrorDescription = "Username/password is null."
                 });
 
@@ -117,7 +117,7 @@ public class AuthController : ControllerBase
             if (user is null)
                 return BadRequest(new OpenIddictResponse
                 {
-                    Error = Errors.InvalidGrant,
+                    Error = OpenIddictConstants.Errors.InvalidGrant,
                     ErrorDescription = "The username/password couple is invalid."
                 });
 
@@ -125,7 +125,7 @@ public class AuthController : ControllerBase
             if (!result.Succeeded)
                 return BadRequest(new OpenIddictResponse
                 {
-                    Error = Errors.InvalidGrant,
+                    Error = OpenIddictConstants.Errors.InvalidGrant,
                     ErrorDescription = "The username/password couple is invalid."
                 });
 
@@ -169,7 +169,7 @@ public class AuthController : ControllerBase
             if (user is null)
                 return Forbid(new AuthenticationProperties(new Dictionary<string, string>
                 {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
                     [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
                         "The refresh token is no longer valid."
                 }!), OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -177,7 +177,7 @@ public class AuthController : ControllerBase
             if (!await _signInManager.CanSignInAsync(user))
                 return Forbid(new AuthenticationProperties(new Dictionary<string, string>
                 {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
                     [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
                         "The user is no longer allowed to sign in."
                 }!), OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -197,7 +197,7 @@ public class AuthController : ControllerBase
 
         return BadRequest(new OpenIddictResponse
         {
-            Error = Errors.UnsupportedGrantType,
+            Error = OpenIddictConstants.Errors.UnsupportedGrantType,
             ErrorDescription = "The specified grant type is not supported."
         });
     }
