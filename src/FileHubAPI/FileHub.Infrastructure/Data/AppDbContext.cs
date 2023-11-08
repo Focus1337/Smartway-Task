@@ -8,6 +8,9 @@ namespace FileHub.Infrastructure.Data;
 
 public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
+    public DbSet<FileGroup> FileGroups { get; set; } = null!;
+    public DbSet<FileMeta> FileMetas { get; set; } = null!;
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
         AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);

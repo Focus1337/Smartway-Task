@@ -1,11 +1,28 @@
 ﻿using FileHub.Core.Interfaces;
+using FileHub.Core.Models;
 using FileHub.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace FileHub.Infrastructure.Repositories;
 
-public class FileMetaRepository : EfRepository<FileHub.Core.Models.FileMeta, AppDbContext>, IFileMetaRepository
+public class FileMetaRepository : IFileMetaRepository
 {
-    public FileMetaRepository(AppDbContext dbContext) : base(dbContext)
+    private readonly AppDbContext _dbContext;
+
+    public FileMetaRepository(AppDbContext dbContext) =>
+        _dbContext = dbContext;
+
+    public async Task<FileMeta?> GetFileMetaAsync(Guid userId, Guid groupId, Guid fileId) =>
+        await _dbContext.FileMetas.Where(fm => fm.UserId == userId)
+            .Where(fm => fm.GroupId == groupId)
+            .FirstOrDefaultAsync(fm => fm.Id == fileId);
+
+    public async Task<List<FileMeta>> GetListOfFilesAsync(Guid userId) =>
+        await _dbContext.FileMetas.Where(fm => fm.UserId == userId).ToListAsync();
+
+    public async Task CreateFileMetaAsync(FileMeta fileGroup)
     {
+        await _dbContext.FileMetas.AddAsync(fileGroup);
+        await _dbContext.SaveChangesAsync();
     }
 }

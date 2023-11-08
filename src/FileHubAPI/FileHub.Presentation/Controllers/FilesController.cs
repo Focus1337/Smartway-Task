@@ -224,8 +224,8 @@ public class FilesController : CustomControllerBase
     {
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
-
-        var result = await _s3Service.GetGroupByIdAsync(user.Id, groupId);
+        
+        var result = await _fileService.GetFileGroupAsync(user.Id, groupId);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 

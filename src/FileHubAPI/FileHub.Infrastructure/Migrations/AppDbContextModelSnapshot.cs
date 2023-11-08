@@ -100,16 +100,13 @@ namespace FileHub.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("FileGroup");
+                    b.ToTable("FileGroups");
                 });
 
             modelBuilder.Entity("FileHub.Core.Models.FileMeta", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("FileGroupId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("FileName")
@@ -127,13 +124,11 @@ namespace FileHub.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FileGroupId");
-
                     b.HasIndex("GroupId");
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("FileMeta");
+                    b.ToTable("FileMetas");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
@@ -477,10 +472,6 @@ namespace FileHub.Infrastructure.Migrations
                 {
                     b.HasOne("FileHub.Core.Models.FileGroup", null)
                         .WithMany("FileMetas")
-                        .HasForeignKey("FileGroupId");
-
-                    b.HasOne("FileHub.Core.Models.FileGroup", null)
-                        .WithMany()
                         .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

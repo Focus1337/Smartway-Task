@@ -8,6 +8,6 @@ public class UploadedFileGroup
     public UploadedFileGroup(string groupId, List<string> fileIds)
     {
         GroupId = groupId;
-        FileIds = new List<string>(fileIds);
+        FileIds = fileIds;
     }
 }

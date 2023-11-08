@@ -36,7 +36,7 @@ public class S3Service : IS3Service, IDisposable
         if (!_userGroupToFilesMap.TryGetValue(GetGroupPrefix(ownerId, groupId), out var filesInProgressList))
             return Task.FromResult(Result.Fail<int>(new GroupAlreadyTransferredError()));
 
-        var searchingFileId = filesInProgressList.First(id => id == fileId);
+        var searchingFileId = filesInProgressList.FirstOrDefault(id => id == fileId);
         if (!_fileProgressTrackingDict.TryGetValue(searchingFileId, out var progress))
             return Task.FromResult(Result.Fail<int>(new FileAlreadyTransferredError()));
 
@@ -56,7 +56,7 @@ public class S3Service : IS3Service, IDisposable
 
         var taskList = files.Select((file, index) =>
             MultipartUploadAsync(file.OpenReadStream(), file.ContentType,
-                StringTransliterateHelper.Transliterate(file.FileName), ownerId,
+                Base64Converter.EncodeToBase64(file.FileName), ownerId,
                 groupId, fileGuids[index])).ToList();
 
         var uploadedFiles = new List<string>();
@@ -132,7 +132,8 @@ public class S3Service : IS3Service, IDisposable
         using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen);
         foreach (var item in files)
         {
-            var entry = archive.CreateEntry(Path.GetFileName(item.Metadata["File-Name"]),
+            var entry = archive.CreateEntry(
+                Base64Converter.DecodeFromBase64(Path.GetFileName(item.Metadata["File-Name"])),
                 CompressionLevel.NoCompression);
 
             await using var entryStream = entry.Open();

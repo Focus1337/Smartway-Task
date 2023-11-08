@@ -9,14 +9,11 @@ public class FileMetaConfiguration : IEntityTypeConfiguration<FileMeta>
     public void Configure(EntityTypeBuilder<FileMeta> builder)
     {
         builder
-            .HasKey(e => e.Id);
-
-        builder
             .HasKey(fm => fm.Id);
 
         builder
             .HasOne<FileGroup>()
-            .WithMany()
+            .WithMany(fm => fm.FileMetas)
             .HasForeignKey(fm => fm.GroupId);
 
         builder
