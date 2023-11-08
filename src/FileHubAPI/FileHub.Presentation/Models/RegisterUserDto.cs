@@ -1,7 +1,11 @@
-﻿namespace FileHub.Presentation.Models;
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace FileHub.Presentation.Models;
 
 public class RegisterUserDto
 {
+    [Required] 
     public required string Email { get; set; }
+    [Required] 
     public required string Password { get; set; }
 }

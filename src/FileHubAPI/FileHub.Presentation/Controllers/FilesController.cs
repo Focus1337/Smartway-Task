@@ -1,5 +1,6 @@
 ﻿using System.Net.Mime;
 using FileHub.Core.Interfaces;
+using FileHub.Core.Models;
 using FileHub.Presentation.Attributes;
 using FileHub.Presentation.Models;
 using FileHub.Presentation.Services;
@@ -12,18 +13,20 @@ namespace FileHub.Presentation.Controllers;
 [ApiController]
 public class FilesController : CustomControllerBase
 {
-    private readonly IFileService _fileService;
+    private readonly IS3Service _s3Service;
     private readonly ApplicationUserService _userService;
+    private readonly IFileService _fileService;
 
-    public FilesController(IFileService fileService, ApplicationUserService userService)
+    public FilesController(ApplicationUserService userService, IS3Service s3Service, IFileService fileService)
     {
-        _fileService = fileService;
         _userService = userService;
+        _s3Service = s3Service;
+        _fileService = fileService;
     }
 
     [HttpGet("{groupId:guid}/{fileId:guid}")]
     [Produces(MediaTypeNames.Application.Json)]
-    [ProducesResponseType(typeof(FileDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(FileMetaDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetFileAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
@@ -31,16 +34,16 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.GetFileByIdAsync(user.Id, groupId, fileId);
+        var result = await _fileService.GetFileMetaAsync(user.Id, groupId, fileId);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 
         var value = result.Value;
-        return Ok(FileDetailsDto.ToDto(value));
+        return Ok(FileMetaDto.EntityToDto(value));
     }
 
     [HttpGet("{groupId:guid}")]
-    [ProducesResponseType(typeof(List<FileDetailsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<FileMetaDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetGroupOfFilesAsync([FromRoute] Guid groupId)
@@ -48,17 +51,17 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.GetGroupByIdAsync(user.Id, groupId);
+        var result = await _fileService.GetFileGroupAsync(user.Id, groupId);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 
-        var response = result.Value.Select(FileDetailsDto.ToDto).ToList();
+        var response = result.Value.Select(FileMetaDto.EntityToDto).ToList();
         return Ok(response);
     }
 
-    [HttpGet]
+    [HttpGet("all-files")]
     [Produces(MediaTypeNames.Application.Json)]
-    [ProducesResponseType(typeof(List<FileDetailsDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<FileMetaDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAllFilesAsync()
@@ -66,11 +69,29 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.GetAllFiles(user.Id);
+        var result = await _fileService.GetListOfFiles(user.Id);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 
-        var response = result.Value.Select(FileDetailsDto.ToDto).ToList();
+        var response = result.Value.Select(FileMetaDto.EntityToDto).ToList();
+        return Ok(response);
+    }
+
+    [HttpGet("all-groups")]
+    [Produces(MediaTypeNames.Application.Json)]
+    [ProducesResponseType(typeof(List<FileMetaDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAllGroupsAsync()
+    {
+        if (await _userService.GetCurrentUser() is not { } user)
+            return UserNotFoundBadRequest();
+
+        var result = await _fileService.GetListOfGroups(user.Id);
+        if (result.IsFailed)
+            return NotFound(ErrorModel.FromErrorList(result.Errors));
+
+        var response = result.Value.Select(FileGroupDto.EntityToDto).ToList();
         return Ok(response);
     }
 
@@ -83,7 +104,7 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.GetFileByIdAsync(user.Id, groupId, fileId);
+        var result = await _s3Service.GetFileByIdAsync(user.Id, groupId, fileId);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 
@@ -104,7 +125,7 @@ public class FilesController : CustomControllerBase
             return;
         }
 
-        var result = await _fileService.GetGroupByIdAsync(user.Id, groupId);
+        var result = await _s3Service.GetGroupByIdAsync(user.Id, groupId);
         if (result.IsFailed)
         {
             Response.StatusCode = StatusCodes.Status404NotFound;
@@ -114,7 +135,7 @@ public class FilesController : CustomControllerBase
 
         Response.ContentType = "application/octet-stream";
         Response.Headers.Add("Content-Disposition", $"attachment; filename=\"files{DateTime.Now:HHmmss-ddMMyy}.zip\"");
-        await _fileService.ZipFiles(Response.BodyWriter.AsStream(), result.Value);
+        await _s3Service.ZipFiles(Response.BodyWriter.AsStream(), result.Value);
     }
 
     [HttpPost("{groupId:guid}/{fileId:guid}/share")]
@@ -126,7 +147,7 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.ShareFileAsync(user.Id, groupId, fileId);
+        var result = await _s3Service.ShareFileAsync(user.Id, groupId, fileId);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 
@@ -142,7 +163,7 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.ShareGroupAsync(user.Id, groupId);
+        var result = await _s3Service.ShareGroupAsync(user.Id, groupId);
         if (result.IsFailed)
             return BadRequest(result.Errors[0].Message);
 
@@ -155,17 +176,30 @@ public class FilesController : CustomControllerBase
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(FileGroupDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(UploadedFileGroupDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> UploadFilesAsync([FromRoute] Guid groupId, [FromForm] List<IFormFile> files)
     {
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.UploadGroupAsync(user.Id, groupId, files);
+        var fileGuids = new List<Guid>();
+        for (var i = 0; i < files.Count; i++)
+            fileGuids.Add(Guid.NewGuid());
+
+        await _fileService.CreateFileGroupAsync(new FileGroup(groupId, user.Id)
+        {
+            FileMetas = files.Select((formFile, index) => new FileMeta
+            {
+                Id = fileGuids[index], UserId = user.Id, GroupId = groupId, FileName = formFile.FileName,
+                LastModified = DateTime.Now
+            }).ToList()
+        });
+
+        var result = await _s3Service.UploadGroupAsync(user.Id, groupId, files, fileGuids);
         if (result.IsFailed)
             return BadRequest(ErrorModel.FromErrorList(result.Errors));
 
-        return Ok(FileGroupDto.FromEntity(result.Value));
+        return Ok(UploadedFileGroupDto.FromEntity(result.Value));
     }
 
     [HttpGet("{groupId:guid}/{fileId:guid}/progress")]
@@ -176,7 +210,7 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.GetFileUploadProgress(user.Id, groupId, fileId);
+        var result = await _s3Service.GetFileUploadProgress(user.Id, groupId, fileId);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 
@@ -191,27 +225,14 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var result = await _fileService.GetGroupByIdAsync(user.Id, groupId);
+        var result = await _s3Service.GetGroupByIdAsync(user.Id, groupId);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 
-        var progressResult = await _fileService.GetGroupUploadProgress(user.Id, groupId);
+        var progressResult = await _s3Service.GetGroupUploadProgress(user.Id, groupId);
         if (progressResult.IsFailed)
             return NotFound(ErrorModel.FromErrorList(progressResult.Errors));
 
         return Ok(progressResult.Value);
-    }
-
-    [HttpDelete("{groupId:guid}/{fileId:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteFileAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
-    {
-        if (await _userService.GetCurrentUser() is not { } user)
-            return UserNotFoundBadRequest();
-
-        var deleteResult = await _fileService.DeleteFileAsync(user.Id, groupId, fileId);
-        return deleteResult.IsSuccess ? NoContent() : NotFound(ErrorModel.FromErrorList(deleteResult.Errors));
     }
 }

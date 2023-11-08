@@ -2,12 +2,13 @@
 
 public class FileGroup
 {
-    public string GroupId { get; init; }
-    public List<string> FileIds { get; init; }
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public required List<FileMeta> FileMetas { get; set; }
 
-    public FileGroup(string groupId, List<string> fileIds)
+    public FileGroup(Guid id, Guid userId)
     {
-        GroupId = groupId;
-        FileIds = new List<string>(fileIds);
+        Id = id;
+        UserId = userId;
     }
 }
