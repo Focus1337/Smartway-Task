@@ -2,7 +2,9 @@
 using System.Net;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.S3.Transfer;
 using FileHub.Core.Errors;
+using FileHub.Core.Helpers;
 using FileHub.Core.Interfaces;
 using FileHub.Core.Models;
 using FluentResults;
@@ -14,7 +16,9 @@ public class FileService : IFileService, IDisposable
 {
     private const string CommonBucketName = "common-bucket";
     private readonly AmazonS3Client _s3Client;
-    public readonly Dictionary<Guid, int> ProgressTrackingDict = new();
+    private readonly Dictionary<Guid, int> _fileProgressTrackingDict = new();
+    private readonly Dictionary<string, int> _userGroupProgressTrackingDict = new();
+    private readonly Dictionary<string, List<Guid>> _userGroupToFilesMap = new();
 
     public FileService(AmazonS3Client s3Client)
     {
@@ -22,43 +26,56 @@ public class FileService : IFileService, IDisposable
     }
 
     public async Task<Result<GetObjectResponse>> GetFileByIdAsync(Guid ownerId, Guid groupId, Guid fileId) =>
-        await GetFileAsync(ToObjectKey(ownerId, groupId, fileId));
+        await GetFileAsync(GetObjectKey(ownerId, groupId, fileId));
 
     public async Task<Result<List<GetObjectResponse>>> GetGroupByIdAsync(Guid ownerId, Guid groupId) =>
-        await GetFilesByPrefix(ToGroupPrefix(ownerId, groupId));
+        await GetFilesByPrefix(GetGroupPrefix(ownerId, groupId));
+
+    public Task<Result<int>> GetFileUploadProgress(Guid ownerId, Guid groupId, Guid fileId)
+    {
+        if (!_userGroupToFilesMap.TryGetValue(GetGroupPrefix(ownerId, groupId), out var filesInProgressList))
+            return Task.FromResult(Result.Fail<int>(new GroupAlreadyTransferredError()));
+
+        var searchingFileId = filesInProgressList.First(id => id == fileId);
+        if (!_fileProgressTrackingDict.TryGetValue(searchingFileId, out var progress))
+            return Task.FromResult(Result.Fail<int>(new FileAlreadyTransferredError()));
+
+        return Task.FromResult(Result.Ok(progress));
+    }
+
+    public Task<Result<int>> GetGroupUploadProgress(Guid ownerId, Guid groupId) =>
+        Task.FromResult(
+            !_userGroupProgressTrackingDict.TryGetValue(GetGroupPrefix(ownerId, groupId), out var progress)
+                ? Result.Fail<int>(new GroupAlreadyTransferredError())
+                : Result.Ok(progress));
 
     public async Task<Result<FileGroup>> UploadGroupAsync(Guid ownerId, Guid groupId, List<IFormFile> files)
     {
-        var taskList = files.Select(file => UploadFileAsync(file.OpenReadStream(), file.ContentType,
-                file.FileName, fileId: Guid.NewGuid(), groupId, ownerId))
-            .ToList();
+        var fileGuids = new List<Guid>();
+        for (var i = 0; i < files.Count; i++)
+            fileGuids.Add(Guid.NewGuid());
+        _userGroupToFilesMap.Add(GetGroupPrefix(ownerId, groupId), new List<Guid>(fileGuids));
+
+        var taskList = files.Select((file, index) =>
+            MultipartUploadAsync(file.OpenReadStream(), file.ContentType,
+                StringTransliterateHelper.Transliterate(file.FileName), ownerId,
+                groupId, fileGuids[index])).ToList();
 
         var uploadedFiles = new List<string>();
         while (taskList.Any())
         {
             var finishedTask = await Task.WhenAny(taskList);
-            Console.WriteLine("TASK FINISHED");
             taskList.Remove(finishedTask);
-            var task = await finishedTask;
 
+            var task = await finishedTask;
             if (task.IsFailed)
                 return Result.Fail<FileGroup>(task.Errors[0]);
 
-            uploadedFiles.Add((await finishedTask).Value);
+            uploadedFiles.Add(task.Value);
         }
 
-        return Result.Ok(new FileGroup(groupId.ToString(), new List<string>()));
-        // return Result.Ok(new FileGroup(groupId.ToString(), uploadedFiles));
+        return Result.Ok(new FileGroup(groupId.ToString(), uploadedFiles));
     }
-
-    // public async Task<int> GetFileUploadProgress(Guid ownerId, Guid groupId, Guid fileId)
-    // {
-    //     
-    // }
-    //
-    // public async Task<int> GetGroupUploadProgress(Guid ownerId, Guid groupId)
-    // {
-    // }
 
     public async Task<Result<List<GetObjectResponse>>> GetAllFiles(Guid ownerId) =>
         await GetFilesByPrefix(ownerId.ToString());
@@ -79,8 +96,8 @@ public class FileService : IFileService, IDisposable
 
         var (gId, fId) = (Guid.NewGuid(), Guid.NewGuid());
 
-        var uploadFileResult = await UploadFileAsync(zipStream, "application/zip", zipFileName,
-            fId, gId, ownerId);
+        var uploadFileResult = await MultipartUploadAsync(zipStream, "application/zip", zipFileName,
+            ownerId, gId, fId);
 
         await zipStream.DisposeAsync();
 
@@ -119,7 +136,7 @@ public class FileService : IFileService, IDisposable
     {
         await ValidateBucket();
 
-        var res = await _s3Client.DeleteObjectAsync(CommonBucketName, ToObjectKey(ownerId, groupId, fileId));
+        var res = await _s3Client.DeleteObjectAsync(CommonBucketName, GetObjectKey(ownerId, groupId, fileId));
         return res.HttpStatusCode == HttpStatusCode.NoContent
             ? Result.Ok()
             : Result.Fail(new FailedToDeleteError(fileId.ToString()));
@@ -138,37 +155,52 @@ public class FileService : IFileService, IDisposable
         }
     }
 
-    private async Task<Result<string>> UploadFileAsync(Stream stream, string contentType, string fileName,
-        Guid fileId, Guid groupId, Guid ownerId)
+    private async Task<Result<string>> MultipartUploadAsync(Stream stream, string contentType, string fileName,
+        Guid ownerId, Guid groupId, Guid fileId)
     {
         await ValidateBucket();
 
-        var request = new PutObjectRequest
+        try
         {
-            Key = ToObjectKey(ownerId, groupId, fileId),
-            InputStream = stream,
-            AutoCloseStream = true,
-            BucketName = CommonBucketName,
-            ContentType = contentType,
-            StreamTransferProgress = (_, args) =>
+            var userGroup = GetGroupPrefix(ownerId, groupId);
+            var fileTransferUtility = new TransferUtility(_s3Client);
+            var fileTransferUtilityRequest = new TransferUtilityUploadRequest
             {
-                // Console.WriteLine($"{groupId}| {fileId} | {args.PercentDone}");
-                ProgressTrackingDict[fileId] = args.PercentDone;
-                // Console.WriteLine(fileId + ": " + args.PercentDone);
-                if (args.PercentDone == 100)
-                    ProgressTrackingDict.Remove(fileId);
-            }
-        };
-        request.Metadata.Add("Owner-Id", ownerId.ToString());
-        request.Metadata.Add("File-Id", fileId.ToString());
-        request.Metadata.Add("Group-id", groupId.ToString());
-        request.Metadata.Add("File-Name", fileName);
-        Console.WriteLine($"{fileName} REQUEST PREPARED");
+                BucketName = CommonBucketName,
+                InputStream = stream,
+                Key = GetObjectKey(ownerId, groupId, fileId),
+                ContentType = contentType
+            };
+            fileTransferUtilityRequest.Metadata.Add("Owner-Id", ownerId.ToString());
+            fileTransferUtilityRequest.Metadata.Add("File-Id", fileId.ToString());
+            fileTransferUtilityRequest.Metadata.Add("Group-id", groupId.ToString());
+            fileTransferUtilityRequest.Metadata.Add("File-Name", fileName);
 
-        var res = await _s3Client.PutObjectAsync(request);
-        return res.HttpStatusCode == HttpStatusCode.OK
-            ? Result.Ok(fileId.ToString())
-            : Result.Fail<string>(new FailedToUploadError(fileName));
+            fileTransferUtilityRequest.UploadProgressEvent += (_, args) =>
+            {
+                _fileProgressTrackingDict[fileId] = args.PercentDone;
+
+                var fileIds = _userGroupToFilesMap[userGroup];
+                var sum = fileIds.Sum(fid => _fileProgressTrackingDict[fid]);
+
+                _userGroupProgressTrackingDict[userGroup] = sum / fileIds.Count;
+
+                if (_userGroupProgressTrackingDict[userGroup] == 100)
+                {
+                    _userGroupToFilesMap.Remove(userGroup);
+                    _userGroupProgressTrackingDict.Remove(userGroup);
+                    fileIds.ForEach(f => _fileProgressTrackingDict.Remove(f));
+                }
+            };
+
+            await fileTransferUtility.UploadAsync(fileTransferUtilityRequest);
+        }
+        catch (AmazonS3Exception)
+        {
+            Result.Fail<string>(new FailedToUploadError(fileName));
+        }
+
+        return Result.Ok(fileId.ToString());
     }
 
     private async Task<Result<List<GetObjectResponse>>> GetFilesByPrefix(string prefix)
@@ -181,12 +213,8 @@ public class FileService : IFileService, IDisposable
         var result = await _s3Client.ListObjectsV2Async(request);
         var keyList = result.S3Objects.Select(o => o.Key).ToList();
 
-        var items = new List<GetObjectResponse>();
-        if (items.Count == 0)
-            return Result.Fail<List<GetObjectResponse>>(new GroupNotFoundError());
-
+        var fileList = new List<GetObjectResponse>();
         var taskList = keyList.Select(GetItemAsync).ToList();
-
         while (taskList.Any())
         {
             var finishedTask = await Task.WhenAny(taskList);
@@ -196,7 +224,9 @@ public class FileService : IFileService, IDisposable
                 return Result.Fail<List<GetObjectResponse>>(task.Errors[0]);
         }
 
-        return Result.Ok(items);
+        return fileList.Count == 0
+            ? Result.Fail<List<GetObjectResponse>>(new GroupNotFoundError())
+            : Result.Ok(fileList);
 
         async Task<Result> GetItemAsync(string key)
         {
@@ -205,7 +235,7 @@ public class FileService : IFileService, IDisposable
                 return Result.Fail(res.Errors[0]);
 
             var file = res.Value;
-            items.Add(file);
+            fileList.Add(file);
             return Result.Ok();
         }
     }
@@ -235,10 +265,10 @@ public class FileService : IFileService, IDisposable
             await _s3Client.PutBucketAsync(CommonBucketName);
     }
 
-    private static string ToObjectKey(Guid ownerId, Guid groupId, Guid fileId) =>
-        $"{ToGroupPrefix(ownerId, groupId)}/{fileId}";
+    private static string GetObjectKey(Guid ownerId, Guid groupId, Guid fileId) =>
+        $"{GetGroupPrefix(ownerId, groupId)}/{fileId}";
 
-    private static string ToGroupPrefix(Guid ownerId, Guid groupId) =>
+    private static string GetGroupPrefix(Guid ownerId, Guid groupId) =>
         $"{ownerId}/{groupId}";
 
     public void Dispose()

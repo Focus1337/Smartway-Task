@@ -9,6 +9,8 @@ public interface IFileService
 {
     Task<Result<GetObjectResponse>> GetFileByIdAsync(Guid ownerId, Guid groupId, Guid fileId);
     Task<Result<List<GetObjectResponse>>> GetGroupByIdAsync(Guid ownerId, Guid groupId);
+    Task<Result<int>> GetFileUploadProgress(Guid ownerId, Guid groupId, Guid fileId);
+    Task<Result<int>> GetGroupUploadProgress(Guid ownerId, Guid groupId);
     Task<Result<FileGroup>> UploadGroupAsync(Guid ownerId, Guid groupId, List<IFormFile> files);
     Task<Result<List<GetObjectResponse>>> GetAllFiles(Guid ownerId);
     Task<Result<string>> ShareGroupAsync(Guid ownerId, Guid groupId);

@@ -149,19 +149,18 @@ public class FilesController : CustomControllerBase
         return Ok(result.Value);
     }
 
-    [HttpPost("upload")]
+    [HttpPut("{groupId:guid}")]
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = int.MaxValue, ValueLengthLimit = int.MaxValue)]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(FileGroupDto), StatusCodes.Status200OK)]
-    public async Task<IActionResult> UploadFilesAsync([FromForm] List<IFormFile> files)
+    public async Task<IActionResult> UploadFilesAsync([FromRoute] Guid groupId, [FromForm] List<IFormFile> files)
     {
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        var groupId = Guid.NewGuid();
         var result = await _fileService.UploadGroupAsync(user.Id, groupId, files);
         if (result.IsFailed)
             return BadRequest(ErrorModel.FromErrorList(result.Errors));
@@ -177,16 +176,11 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
 
-        // if (await _fileService.GetByFileIdAsync(user.Id, id) is null)
-        //     return BadRequest("File not found");
+        var result = await _fileService.GetFileUploadProgress(user.Id, groupId, fileId);
+        if (result.IsFailed)
+            return NotFound(ErrorModel.FromErrorList(result.Errors));
 
-        // if (!_fileService.ProgressTrackingDict.ContainsKey(id))
-        //     return Ok("Already transferred");
-        //
-        // var progress = _fileService.ProgressTrackingDict.GetValueOrDefault(id);
-
-        // return Ok(progress);
-        return Ok();
+        return Ok(result.Value);
     }
 
     [HttpGet("{groupId:guid}/progress")]
@@ -201,42 +195,11 @@ public class FilesController : CustomControllerBase
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));
 
-        // var taskList = ids.Select(id => GetUploadProgress(user.Id, id)).ToList();
-        // var taskCount = taskList.Count;
-        // var progressSum = 0;
-        //
-        // while (taskList.Any())
-        // {
-        //     var finishedTask = await Task.WhenAny(taskList);
-        //     taskList.Remove(finishedTask);
-        //     var task = await finishedTask;
-        //     if (task.IsSuccess)
-        //         progressSum += task.Value;
-        // }
-        //
-        // async Task<Result<int>> GetUploadProgress(Guid userId, string fileId)
-        // {
-        //     var result = await _fileService.GetFileByIdAsync(userId, fileId);
-        //     if (result.IsFailed)
-        //     {
-        //         Response.StatusCode = 400;
-        //         await Response.WriteAsJsonAsync(new ErrorDto("error", "no such file"));
-        //         return Result.Fail<int>(result.Errors[0]);
-        //     }
-        //
-        //     if (!_fileService.ProgressTrackingDict.ContainsKey(fileId))
-        //     {
-        //         Response.StatusCode = 400;
-        //         await Response.WriteAsJsonAsync(new ErrorDto("error", "File already transferred"));
-        //         return Result.Fail<int>("File already transferred");
-        //     }
-        //
-        //     return Result.Ok(_fileService.ProgressTrackingDict.GetValueOrDefault(fileId));
-        // }
+        var progressResult = await _fileService.GetGroupUploadProgress(user.Id, groupId);
+        if (progressResult.IsFailed)
+            return NotFound(ErrorModel.FromErrorList(progressResult.Errors));
 
-        // return Ok(progressSum / taskCount);
-
-        return Ok();
+        return Ok(progressResult.Value);
     }
 
     [HttpDelete("{groupId:guid}/{fileId:guid}")]

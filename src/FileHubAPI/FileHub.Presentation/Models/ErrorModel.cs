@@ -22,6 +22,4 @@ public class ErrorModel
 
     public static List<ErrorModel> FromIdentityResult(IdentityResult identityResult) =>
         new(identityResult.Errors.Select(error => new ErrorModel(error.Code, error.Description)));
-    
-    
 }
