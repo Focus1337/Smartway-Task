@@ -1,7 +1,7 @@
 services:
   api:
     build:
-      context: ./FileHubAPI
+      context: ./src/FileHubAPI
       dockerfile: FileHub.Presentation/Dockerfile
     ports:
       - 5002:5002

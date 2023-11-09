@@ -22,10 +22,4 @@ public class FileMetaRepository : IFileMetaRepository
 
     public async Task<List<FileMeta>> GetListOfFilesAsync(Guid userId) =>
         await _dbContext.FileMetas.Where(fm => fm.UserId == userId).ToListAsync();
-
-    public async Task CreateFileMetaAsync(FileMeta fileGroup)
-    {
-        await _dbContext.FileMetas.AddAsync(fileGroup);
-        await _dbContext.SaveChangesAsync();
-    }
 }

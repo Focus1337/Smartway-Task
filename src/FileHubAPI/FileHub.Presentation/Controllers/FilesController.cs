@@ -14,10 +14,10 @@ namespace FileHub.Presentation.Controllers;
 public class FilesController : CustomControllerBase
 {
     private readonly IS3Service _s3Service;
-    private readonly ApplicationUserService _userService;
+    private readonly IApplicationUserService _userService;
     private readonly IFileService _fileService;
 
-    public FilesController(ApplicationUserService userService, IS3Service s3Service, IFileService fileService)
+    public FilesController(IApplicationUserService userService, IS3Service s3Service, IFileService fileService)
     {
         _userService = userService;
         _s3Service = s3Service;
@@ -121,7 +121,7 @@ public class FilesController : CustomControllerBase
         if (await _userService.GetCurrentUser() is not { } user)
         {
             Response.StatusCode = StatusCodes.Status400BadRequest;
-            await Response.WriteAsJsonAsync(new List<ErrorModel> { new("UserNotFound", "User Not Found") });
+            await Response.WriteAsJsonAsync(new List<ErrorModel> { new("UserNotFound", "User not found") });
             return;
         }
 

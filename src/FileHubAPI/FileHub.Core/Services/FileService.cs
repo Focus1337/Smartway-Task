@@ -35,7 +35,7 @@ public class FileService : IFileService
         Result.Ok(await _metaRepository.GetListOfFilesAsync(userId));
 
     public async Task<Result<List<FileGroup>>> GetListOfGroups(Guid userId) =>
-        Result.Ok(await _groupRepository.GetListOfGroups(userId));
+        Result.Ok(await _groupRepository.GetListOfGroupsAsync(userId));
 
     public async Task CreateFileGroupAsync(FileGroup fileGroup) =>
         await _groupRepository.CreateFileGroupAsync(fileGroup);

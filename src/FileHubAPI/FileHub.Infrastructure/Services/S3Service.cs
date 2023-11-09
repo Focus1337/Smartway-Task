@@ -18,12 +18,13 @@ namespace FileHub.Infrastructure.Services;
 public class S3Service : IS3Service, IDisposable
 {
     private const string CommonBucketName = "common-bucket";
-    private readonly AmazonS3Client _s3Client;
+
+    private readonly IAmazonS3 _s3Client;
     private readonly Dictionary<Guid, int> _fileProgressTrackingDict = new();
     private readonly Dictionary<string, int> _userGroupProgressTrackingDict = new();
     private readonly Dictionary<string, List<Guid>> _userGroupToFilesMap = new();
 
-    public S3Service(AmazonS3Client s3Client)
+    public S3Service(IAmazonS3 s3Client)
     {
         _s3Client = s3Client;
     }
