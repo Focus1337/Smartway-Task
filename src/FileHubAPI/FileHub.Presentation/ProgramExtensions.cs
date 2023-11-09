@@ -4,6 +4,8 @@ using FileHub.Core.Models;
 using FileHub.Core.Services;
 using FileHub.Infrastructure.Data;
 using FileHub.Infrastructure.Options;
+using FileHub.Infrastructure.Repositories;
+using FileHub.Infrastructure.Services;
 using FileHub.Presentation.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +30,10 @@ public static class ProgramExtensions
     public static void AddCustomApplicationServices(this WebApplicationBuilder builder)
     {
         builder.Services.AddTransient<ApplicationUserService>();
-        builder.Services.AddSingleton<IFileService, FileService>();
+        builder.Services.AddSingleton<IS3Service, S3Service>();
+        builder.Services.AddScoped<IFileService, FileService>();
+        builder.Services.AddScoped<IFileGroupRepository, FileGroupRepository>();
+        builder.Services.AddScoped<IFileMetaRepository, FileMetaRepository>();
     }
 
     public static void AddCustomSwaggerGen(this WebApplicationBuilder builder) =>

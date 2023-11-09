@@ -4,15 +4,15 @@ namespace FileHub.Presentation.Models;
 
 public class FileGroupDto
 {
-    public string GroupId { get; init; }
-    public List<string> FileIds { get; init; }
+    public Guid Id { get; set; }
+    public List<FileMeta> FileMetas { get; set; }
 
-    public FileGroupDto(string groupId, List<string> fileIds)
+    public FileGroupDto(Guid id, List<FileMeta> fileMetas)
     {
-        GroupId = groupId;
-        FileIds = new List<string>(fileIds);
+        Id = id;
+        FileMetas = fileMetas;
     }
 
-    public static FileGroupDto FromEntity(FileGroup fileGroup) =>
-        new(fileGroup.GroupId, new List<string>(fileGroup.FileIds));
+    public static FileGroupDto EntityToDto(FileGroup model) =>
+        new(model.Id, model.FileMetas);
 }

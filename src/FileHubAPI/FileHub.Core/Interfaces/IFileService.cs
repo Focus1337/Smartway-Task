@@ -1,20 +1,50 @@
-﻿using Amazon.S3.Model;
-using FileHub.Core.Models;
+﻿using FileHub.Core.Models;
 using FluentResults;
-using Microsoft.AspNetCore.Http;
 
 namespace FileHub.Core.Interfaces;
 
+/// <summary>
+/// <para>
+/// Сервис <c>IFileService</c> используется для работы с группами метаданных файлов <see cref="FileGroup"/> или отдельными
+/// метаданными файлов <see cref="FileMeta"/>.
+/// </para>
+/// </summary>
 public interface IFileService
 {
-    Task<Result<GetObjectResponse>> GetFileByIdAsync(Guid ownerId, Guid groupId, Guid fileId);
-    Task<Result<List<GetObjectResponse>>> GetGroupByIdAsync(Guid ownerId, Guid groupId);
-    Task<Result<int>> GetFileUploadProgress(Guid ownerId, Guid groupId, Guid fileId);
-    Task<Result<int>> GetGroupUploadProgress(Guid ownerId, Guid groupId);
-    Task<Result<FileGroup>> UploadGroupAsync(Guid ownerId, Guid groupId, List<IFormFile> files);
-    Task<Result<List<GetObjectResponse>>> GetAllFiles(Guid ownerId);
-    Task<Result<string>> ShareGroupAsync(Guid ownerId, Guid groupId);
-    Task<Result<string>> ShareFileAsync(Guid ownerId, Guid groupId, Guid fileId);
-    Task<Result> DeleteFileAsync(Guid ownerId, Guid groupId, Guid fileId);
-    Task ZipFiles(Stream stream, List<GetObjectResponse> files, bool leaveOpen = false);
+    /// <summary>
+    /// Получить метаданные файла <see cref="FileMeta"/> пользователя.
+    /// </summary>
+    /// <param name="userId">ID пользователя</param>
+    /// <param name="groupId">ID группы</param>
+    /// <param name="fileId">ID файла</param>
+    /// <returns>Метаданные файла</returns>
+    Task<Result<FileMeta>> GetFileMetaAsync(Guid userId, Guid groupId, Guid fileId);
+
+    /// <summary>
+    /// Получить группу файлов <see cref="FileGroup"/> пользователя.
+    /// </summary>
+    /// <param name="userId">ID пользователя</param>
+    /// <param name="groupId">ID группы</param>
+    /// <returns>Группа файлов</returns>
+    Task<Result<List<FileMeta>>> GetFileGroupAsync(Guid userId, Guid groupId);
+
+    /// <summary>
+    /// Получить список всех метаданных файлов <see cref="FileMeta"/> пользователя.
+    /// </summary>
+    /// <param name="userId">ID пользователя</param>
+    /// <returns>Список метаданных файлов</returns>
+    Task<Result<List<FileMeta>>> GetListOfFiles(Guid userId);
+
+    /// <summary>
+    /// Получить список всех групп файлов <see cref="FileGroup"/> паользователя.
+    /// </summary>
+    /// <param name="userId">ID пользователя</param>
+    /// <returns>Список групп файлов</returns>
+    Task<Result<List<FileGroup>>> GetListOfGroups(Guid userId);
+
+    /// <summary>
+    /// Создать <see cref="FileGroup"/>.
+    /// </summary>
+    /// <param name="fileGroup">Группа файлов</param>
+    Task CreateFileGroupAsync(FileGroup fileGroup);
 }
