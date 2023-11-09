@@ -8,7 +8,7 @@ namespace FileHub.Presentation.Services;
 /// <summary>
 /// Сервис для работы с текущим пользователем. Получает данные из Http контекста.
 /// </summary>
-public class ApplicationUserService
+public class ApplicationUserService : IApplicationUserService
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IHttpContextAccessor _httpContextAccessor;

@@ -22,7 +22,7 @@ public interface IFileGroupRepository
     /// </summary>
     /// <param name="userId">ID пользователя</param>
     /// <returns>Список групп файлов </returns>
-    Task<List<FileGroup>> GetListOfGroups(Guid userId);
+    Task<List<FileGroup>> GetListOfGroupsAsync(Guid userId);
 
     /// <summary>
     /// Создать <see cref="FileGroup"/>.

@@ -15,7 +15,7 @@ public class FileGroupRepository : IFileGroupRepository
     public FileGroupRepository(AppDbContext dbContext) =>
         _dbContext = dbContext;
 
-    public async Task<List<FileGroup>> GetListOfGroups(Guid userId) =>
+    public async Task<List<FileGroup>> GetListOfGroupsAsync(Guid userId) =>
         await _dbContext.FileGroups.Where(fg => fg.UserId == userId)
             .Include(fg => fg.FileMetas)
             .ToListAsync();

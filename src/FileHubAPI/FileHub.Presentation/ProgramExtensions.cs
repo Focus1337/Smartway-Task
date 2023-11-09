@@ -29,7 +29,7 @@ public static class ProgramExtensions
 
     public static void AddCustomApplicationServices(this WebApplicationBuilder builder)
     {
-        builder.Services.AddTransient<ApplicationUserService>();
+        builder.Services.AddTransient<IApplicationUserService, ApplicationUserService>();
         builder.Services.AddSingleton<IS3Service, S3Service>();
         builder.Services.AddScoped<IFileService, FileService>();
         builder.Services.AddScoped<IFileGroupRepository, FileGroupRepository>();
@@ -98,7 +98,7 @@ public static class ProgramExtensions
         if (s3Options is null)
             throw new ArgumentException("Cannot register Minio: MinioOptions is null. Check appsettings.");
 
-        builder.Services.AddSingleton(new AmazonS3Client(s3Options.AccessKey, s3Options.SecretKey,
+        builder.Services.AddSingleton<IAmazonS3>(new AmazonS3Client(s3Options.AccessKey, s3Options.SecretKey,
             new AmazonS3Config { ServiceURL = s3Options.ServiceUrl, ForcePathStyle = true }));
     }
 
