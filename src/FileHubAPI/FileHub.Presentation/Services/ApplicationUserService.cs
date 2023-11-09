@@ -5,6 +5,9 @@ using OpenIddict.Abstractions;
 
 namespace FileHub.Presentation.Services;
 
+/// <summary>
+/// Сервис для работы с текущим пользователем. Получает данные из Http контекста.
+/// </summary>
 public class ApplicationUserService
 {
     private readonly UserManager<ApplicationUser> _userManager;

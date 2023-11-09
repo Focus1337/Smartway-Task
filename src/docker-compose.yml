@@ -1,4 +1,28 @@
 services:
+  api:
+    build:
+      context: ./FileHubAPI
+      dockerfile: FileHub.Presentation/Dockerfile
+    ports:
+      - 5002:5002
+      - 5001:5001
+    volumes:
+      - "/src/FileHub.Presentation/bin"
+      - "/src/FileHub.Presentation/obj"
+      - "/src/FileHub.Core/bin"
+      - "/src/FileHub.Core/obj"
+      - "/src/FileHub.Infrastructure/bin"
+      - "/src/FileHub.Infrastructure/obj"
+    environment:
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=fllkwefiwejf23049uwlekjf.sEFWEFGR98^&$
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+      - ASPNETCORE_URLS=https://+:5002;http://+:5001
+      - ASPNETCORE_HTTPS_PORT=5002
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - minio
+      - postgres
+  
   postgres:
     image: postgres:14.5
     environment:

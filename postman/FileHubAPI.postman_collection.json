@@ -1,0 +1,943 @@
+{
+	"info": {
+		"_postman_id": "58613d3a-0df7-47b4-92fe-e72ffa1ece3c",
+		"name": "FileHubAPI",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24523543"
+	},
+	"item": [
+		{
+			"name": "auth",
+			"item": [
+				{
+					"name": "/auth/register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"",
+									"pm.test(\"Response body is not empty\", function () {",
+									"    pm.expect(pm.response.text()).not.to.be.empty;",
+									"});",
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"function generateRandomEmail() {\r",
+									"    var chars = 'abcdefghijklmnopqrstuvwxyz1234567890';\r",
+									"    var email = '';\r",
+									"    for (var i = 0; i < 10; i++) {\r",
+									"        var randomChar = chars[Math.floor(Math.random() * chars.length)];\r",
+									"        email += randomChar;\r",
+									"    }\r",
+									"    email += '@test.com';\r",
+									"    return email;\r",
+									"}\r",
+									"\r",
+									"pm.environment.set(\"random_email\", generateRandomEmail());\r",
+									"pm.environment.set(\"random_password\", \"123123123\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"{{random_email}}\",\r\n    \"password\": \"{{random_password}}\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{api_host}}/auth/register",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "connect/token",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response contains the required fields\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.access_token).to.exist.and.to.be.a('string');",
+									"    pm.expect(responseData.token_type).to.exist.and.to.be.a('string');",
+									"    pm.expect(responseData.expires_in).to.exist.and.to.be.a('number');",
+									"});",
+									"",
+									"pm.test(\"Access token is a non-empty string with a minimum length of 1\", function () {",
+									"    const responseData = pm.response.json();",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.access_token).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Access token should not be empty\");",
+									"});",
+									"",
+									"pm.environment.set('access_token', pm.response.json().access_token);",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{
+									"key": "username",
+									"value": "{{random_email}}",
+									"type": "text"
+								},
+								{
+									"key": "password",
+									"value": "{{random_password}}",
+									"type": "text"
+								},
+								{
+									"key": "grant_type",
+									"value": "password",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{api_host}}/connect/token",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"connect",
+								"token"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/auth/logout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/auth/logout",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "files",
+			"item": [
+				{
+					"name": "/api/files/all-files",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"})",
+									"",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(pm.response.json()).to.be.an('array');",
+									"});",
+									"",
+									"",
+									"pm.test(\"At least one element in the array has fileId property value equal to file_id\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    var found = false;",
+									"    if (Array.isArray(jsonData)) {",
+									"        jsonData.forEach(function(file) {",
+									"            if (file.fileId === pm.environment.get(\"file_id\")) {",
+									"                found = true;",
+									"            }",
+									"        });",
+									"    }",
+									"    pm.expect(found).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/all-files",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								"all-files"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/all-groups",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"})",
+									"",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(pm.response.json()).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Each element in the array has properties id and fileMetas\", function () {",
+									"    pm.response.json().forEach(function (group) {",
+									"        pm.expect(group).to.have.all.keys('id', 'fileMetas');",
+									"    });",
+									"});",
+									"",
+									"pm.test(\"Each fileMeta object has properties id, groupId, userId, fileName, and lastModified\", function () {",
+									"    pm.response.json().forEach(function (group) {",
+									"        group.fileMetas.forEach(function (fileMeta) {",
+									"            pm.expect(fileMeta).to.have.all.keys('id', 'groupId', 'userId', 'fileName', 'lastModified');",
+									"        });",
+									"    });",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/all-groups",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								"all-groups"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}/{fileId}",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response groupId equals to environment group_id\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.groupId).to.equal(pm.environment.get(\"group_id\"));",
+									"});",
+									"",
+									"pm.test(\"Response fileId equals to environment file_id\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.fileId).to.equal(pm.environment.get(\"file_id\"));",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/:groupId/:fileId",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								":groupId",
+								":fileId"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "{{group_id}}"
+								},
+								{
+									"key": "fileId",
+									"value": "{{file_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}/{fileId}/download",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/:groupId/:fileId/download",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								":groupId",
+								":fileId",
+								"download"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "{{group_id}}"
+								},
+								{
+									"key": "fileId",
+									"value": "{{file_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}/{fileId}/share",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response is a string\", function () {\r",
+									"    pm.expect(pm.response.text()).to.be.a('string');\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response contains the expected URL\", function () {\r",
+									"    pm.expect(pm.response.text()).to.include('http://localhost:9000/common-bucket');\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response contains group_id in URL\", function () {\r",
+									"    pm.expect(pm.response.text()).to.include(pm.environment.get(\"group_id\"));\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response contains file_id in URL\", function () {\r",
+									"    pm.expect(pm.response.text()).to.include(pm.environment.get(\"file_id\"));\r",
+									"});\r",
+									"\r",
+									"pm.environment.set('file_download_link', pm.response.text());"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/:groupId/:fileId/share",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								":groupId",
+								":fileId",
+								"share"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "{{group_id}}"
+								},
+								{
+									"key": "fileId",
+									"value": "{{file_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}/{fileId}/progress",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const getRequest = {\r",
+									"  url: pm.environment.get(\"api_host\") + \"/api/files/\" + pm.environment.get(\"group_id\"),\r",
+									"  method: 'GET',\r",
+									"  header: {\r",
+									"    'Authorization': 'Bearer ' + pm.environment.get(\"access_token\"),\r",
+									"  },\r",
+									"};\r",
+									"\r",
+									"pm.sendRequest(getRequest, (error, response) => {\r",
+									"  if (error) {\r",
+									"      console.log();\r",
+									"  }  \r",
+									"\r",
+									"  if (response === null) {\r",
+									"      return;\r",
+									"  }\r",
+									"\r",
+									"  pm.environment.set(\"file_id\", response.json()[0].fileId);\r",
+									"});\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response is a number\", function () {\r",
+									"    pm.expect(Number.parseInt(pm.response.text())).to.be.a('number');\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/:groupId/:fileId/progress",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								":groupId",
+								":fileId",
+								"progress"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "{{group_id}}"
+								},
+								{
+									"key": "fileId",
+									"value": "{{file_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(pm.response.json()).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Each element in the array has the required properties\", function () {",
+									"    pm.response.json().forEach(function(file) {",
+									"        pm.expect(file).to.have.property('fileId');",
+									"        pm.expect(file).to.have.property('groupId');",
+									"        pm.expect(file).to.have.property('ownerId');",
+									"        pm.expect(file).to.have.property('fileName');",
+									"        pm.expect(file).to.have.property('lastModified');",
+									"    });",
+									"});",
+									"",
+									"pm.test(\"Any item in the array has property value fileId that equals to environment file_id\", function () {",
+									"    var file_id = pm.environment.get(\"file_id\");",
+									"    pm.response.json().forEach(function(file) {",
+									"        pm.expect(file.fileId).to.equal(file_id);",
+									"    });",
+									"});",
+									"",
+									"pm.environment.set(\"file_id\", pm.response.json()[0].fileId);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/:groupId",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								":groupId"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "{{group_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}/download",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {",
+									"    pm.expect(pm.response.code).to.equal(200);",
+									"});",
+									"",
+									"pm.test(\"Response content type is application/octet-stream\", function () {",
+									"    pm.response.to.have.header(\"Content-Type\", \"application/octet-stream\");",
+									"});",
+									"",
+									"pm.test(\"Response Header Content-Disposition value has a '.zip'\", function () {",
+									"    var contentDispositionHeader = pm.response.headers.get('Content-Disposition');",
+									"    pm.expect(contentDispositionHeader).to.include('.zip');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/:groupId/download",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								":groupId",
+								"download"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "{{group_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}/share",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response is a string\", function () {\r",
+									"    pm.expect(pm.response.text()).to.be.a('string');\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response contains the expected URL\", function () {\r",
+									"    pm.expect(pm.response.text()).to.include('http://localhost:9000/common-bucket');\r",
+									"});\r",
+									"\r",
+									"pm.environment.set('file_download_link', pm.response.text());"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/:groupId/share",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								":groupId",
+								"share"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "{{group_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}/progress",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"const getRequest = {\r",
+									"  url: pm.environment.get(\"api_host\") + \"/api/files/\" + pm.environment.get(\"group_id\"),\r",
+									"  method: 'GET',\r",
+									"  header: {\r",
+									"    'Authorization': 'Bearer ' + pm.environment.get(\"access_token\"),\r",
+									"  },\r",
+									"};\r",
+									"\r",
+									"pm.sendRequest(getRequest, (error, response) => {\r",
+									"  if (error) {\r",
+									"      console.log();\r",
+									"  }  \r",
+									"\r",
+									"  if (response === null) {\r",
+									"      return;\r",
+									"  }\r",
+									"\r",
+									"  pm.environment.set(\"file_id\", response.json()[0].fileId);\r",
+									"});\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_host}}/api/files/:groupId/progress",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								":groupId",
+								"progress"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "{{group_id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/files/{groupId}",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"var uuid = require('uuid');\r",
+									"pm.environment.set('group_id', uuid.v4());"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Request has a form-data body\", function() {",
+									"    pm.expect(pm.request.body.mode).to.equal('formdata');",
+									"});",
+									"",
+									"pm.test(\"Response status code is 200\", function () {",
+									"    pm.expect(pm.response.code).to.equal(200);",
+									"});",
+									"",
+									"pm.test(\"Validate that groupId is a non-empty string\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData.groupId).to.be.a('string').and.to.have.lengthOf.at.least(1, \"groupId should not be empty\");",
+									"});",
+									"",
+									"pm.test(\"Verify that fileIds array is present and has any id\", function () {",
+									"    const responseData = pm.response.json();",
+									"    ",
+									"    pm.expect(responseData).to.be.an('object');",
+									"    pm.expect(responseData.fileIds).to.exist.and.to.be.an('array').that.has.any;",
+									"    pm.expect(responseData.fileIds[0]).to.be.a('string').and.to.have.lengthOf.at.least(1, \"fileIds array should have at least one id\");",
+									"});",
+									"",
+									"let file_id = pm.response.json().fileIds[0];",
+									"pm.environment.set(\"file_id\", file_id);",
+									"",
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "files",
+									"type": "file",
+									"src": "/C:/Users/Focus/Desktop/Other/VHS Actions_Patterns.pat"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{api_host}}/api/files/{{group_id}}",
+							"host": [
+								"{{api_host}}"
+							],
+							"path": [
+								"api",
+								"files",
+								"{{group_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{access_token}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "shared-links",
+			"item": [
+				{
+					"name": "link-active",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {\r",
+									"    pm.response.to.have.status(200);\r",
+									"});\r",
+									""
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{file_download_link}}",
+							"host": [
+								"{{file_download_link}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "link-expired",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 403\", function () {\r",
+									"    pm.response.to.have.status(403);\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response contains AccessDenied error\", function () {\r",
+									"    pm.expect(pm.response.text()).to.include(\"AccessDenied\");\r",
+									"});\r",
+									"\r",
+									"pm.test(\"Response contains Request has expired message\", function () {\r",
+									"    pm.expect(pm.response.text()).to.include(\"Request has expired\");\r",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"setTimeout(() => {console.log('60 seconds spent')}, 60000);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{file_download_link}}",
+							"host": [
+								"{{file_download_link}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

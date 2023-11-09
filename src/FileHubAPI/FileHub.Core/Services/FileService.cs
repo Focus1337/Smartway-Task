@@ -5,6 +5,9 @@ using FluentResults;
 
 namespace FileHub.Core.Services;
 
+/// <summary>
+/// <inheritdoc cref="IFileService"/>
+/// </summary>
 public class FileService : IFileService
 {
     private readonly IFileGroupRepository _groupRepository;
@@ -28,11 +31,11 @@ public class FileService : IFileService
         return result is null ? Result.Fail<List<FileMeta>>(new GroupNotFoundError()) : Result.Ok(result.FileMetas);
     }
 
-    public async Task<Result<List<FileMeta>>> GetListOfFiles(Guid ownerId) =>
-        Result.Ok(await _metaRepository.GetListOfFilesAsync(ownerId));
+    public async Task<Result<List<FileMeta>>> GetListOfFiles(Guid userId) =>
+        Result.Ok(await _metaRepository.GetListOfFilesAsync(userId));
 
-    public async Task<Result<List<FileGroup>>> GetListOfGroups(Guid ownerId) =>
-        Result.Ok(await _groupRepository.GetListOfGroups(ownerId));
+    public async Task<Result<List<FileGroup>>> GetListOfGroups(Guid userId) =>
+        Result.Ok(await _groupRepository.GetListOfGroups(userId));
 
     public async Task CreateFileGroupAsync(FileGroup fileGroup) =>
         await _groupRepository.CreateFileGroupAsync(fileGroup);

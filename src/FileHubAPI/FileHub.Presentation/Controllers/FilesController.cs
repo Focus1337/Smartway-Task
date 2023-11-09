@@ -79,7 +79,7 @@ public class FilesController : CustomControllerBase
 
     [HttpGet("all-groups")]
     [Produces(MediaTypeNames.Application.Json)]
-    [ProducesResponseType(typeof(List<FileMetaDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<FileGroupDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAllGroupsAsync()
@@ -139,9 +139,9 @@ public class FilesController : CustomControllerBase
     }
 
     [HttpPost("{groupId:guid}/{fileId:guid}/share")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     public async Task<IActionResult> ShareFileAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
@@ -155,9 +155,9 @@ public class FilesController : CustomControllerBase
     }
 
     [HttpPost("{groupId:guid}/share")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     public async Task<IActionResult> ShareGroupOfFilesAsync([FromRoute] Guid groupId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
@@ -174,9 +174,9 @@ public class FilesController : CustomControllerBase
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = int.MaxValue, ValueLengthLimit = int.MaxValue)]
     [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(UploadedFileGroupDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(UploadedFileGroupDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> UploadFilesAsync([FromRoute] Guid groupId, [FromForm] List<IFormFile> files)
     {
         if (await _userService.GetCurrentUser() is not { } user)
@@ -203,6 +203,7 @@ public class FilesController : CustomControllerBase
     }
 
     [HttpGet("{groupId:guid}/{fileId:guid}/progress")]
+    [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetFileProgressAsync([FromRoute] Guid groupId, [FromRoute] Guid fileId)
@@ -218,13 +219,14 @@ public class FilesController : CustomControllerBase
     }
 
     [HttpGet("{groupId:guid}/progress")]
+    [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(List<ErrorModel>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetGroupOfFilesProgressAsync([FromRoute] Guid groupId)
     {
         if (await _userService.GetCurrentUser() is not { } user)
             return UserNotFoundBadRequest();
-        
+
         var result = await _fileService.GetFileGroupAsync(user.Id, groupId);
         if (result.IsFailed)
             return NotFound(ErrorModel.FromErrorList(result.Errors));

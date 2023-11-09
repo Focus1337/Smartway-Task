@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FileHub.Infrastructure.Repositories;
 
+/// <summary>
+/// <inheritdoc cref="IFileMetaRepository"/>
+/// </summary>
 public class FileMetaRepository : IFileMetaRepository
 {
     private readonly AppDbContext _dbContext;

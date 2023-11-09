@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FileHub.Infrastructure.Repositories;
 
+/// <summary>
+/// <inheritdoc cref="IFileGroupRepository"/>
+/// </summary>
 public class FileGroupRepository : IFileGroupRepository
 {
     private readonly AppDbContext _dbContext;
@@ -12,8 +15,8 @@ public class FileGroupRepository : IFileGroupRepository
     public FileGroupRepository(AppDbContext dbContext) =>
         _dbContext = dbContext;
 
-    public async Task<List<FileGroup>> GetListOfGroups(Guid ownerId) =>
-        await _dbContext.FileGroups.Where(fg => fg.UserId == ownerId)
+    public async Task<List<FileGroup>> GetListOfGroups(Guid userId) =>
+        await _dbContext.FileGroups.Where(fg => fg.UserId == userId)
             .Include(fg => fg.FileMetas)
             .ToListAsync();
 

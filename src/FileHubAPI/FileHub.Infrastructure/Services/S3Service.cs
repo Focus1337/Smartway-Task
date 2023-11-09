@@ -12,6 +12,9 @@ using Microsoft.AspNetCore.Http;
 
 namespace FileHub.Infrastructure.Services;
 
+/// <summary>
+/// <inheritdoc cref="IS3Service"/>
+/// </summary>
 public class S3Service : IS3Service, IDisposable
 {
     private const string CommonBucketName = "common-bucket";
